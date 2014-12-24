@@ -174,7 +174,7 @@ renderer = new THREE.WebGLRenderer( {
   stencil: false,
   maxLights: !isMobile ? 4 : 2
 } );
-renderer.devicePixelRatio = !isMobile ? 1 : .5;
+// renderer.devicePixelRatio = !isMobile ? 1 : .5;
 renderer.setSize( width, height );
 renderer.setClearColor( 0xcccccc, 1 );
 document.body.appendChild( renderer.domElement );
