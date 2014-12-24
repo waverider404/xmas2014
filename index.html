@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>=^.^=</title>
+<link rel="stylesheet" href="lib/virtualInput.css">
+
+<style>
+body{margin: 0;padding: 0; background: #000;}
+canvas{
+  display: block;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;
+}
+
+#joystick1,
+#joystick2{
+  bottom: 30px;
+}
+#joystick1{left: 50px;}
+#joystick2{right: 50px;}
+@media ( max-width: 768px ) {
+  #joystick1,
+  #joystick2{
+    bottom:0px;
+  }
+  #joystick1{left: 0px;}
+  #joystick2{right: 0px;}
+}
+
+#button1{
+  bottom: 240px;
+  right: 180px;
+}
+#button2{
+  bottom: 240px;
+  right: 80px;
+}
+@media ( max-width: 768px ) {
+  #button1{
+    right: 160px;
+    bottom: 200px;
+  }
+  #button2{
+    right: 60px;
+    bottom: 200px;
+  } 
+}
+
+.virtualInput-joystick__frame{
+  opacity: .5;
+}
+.virtualInput-joystick__button{
+  border: 1px solid #333;
+  background: rgba( 0, 0, 0, .5 );
+}
+.virtualInput-joystick__arrowUp,
+.virtualInput-joystick__arrowRight,
+.virtualInput-joystick__arrowDown,
+.virtualInput-joystick__arrowLeft{
+  fill: #000;
+}
+.virtualInput-joystick__circle{
+  fill: none;
+  stroke: #000;
+}
+.virtualInput-button{
+  border: 1px solid #333;
+  background: rgba( 0, 0, 0, .5 );
+}
+
+</style>
+
+</head>
+<body>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script src="lib/three.min.js"></script>
+<script src="lib/threefield.min.js"></script>
+<script src="lib/threefield.TPS.min.js"></script>
+<script src="lib/virtualInput.js"></script>
+<script>
+
+////////////////////////////////////////
+// utils
+////////////////////////////////////////
+
+var isMobile = ( function () {
+
+  var ua = navigator.userAgent,
+      apple_phone      = /iPhone/i,
+      apple_ipod       = /iPod/i,
+      apple_tablet     = /iPad/i,
+      android_phone    = /(?=.*\bAndroid\b)(?=.*\bMobile\b)/i, // Match 'Android' AND 'Mobile'
+      android_tablet   = /Android/i,
+      windows_phone    = /IEMobile/i,
+      windows_tablet   = /(?=.*\bWindows\b)(?=.*\bARM\b)/i, // Match 'Windows' AND 'ARM'
+      other_blackberry = /BlackBerry/i,
+      other_opera      = /Opera Mini/i,
+      other_firefox    = /(?=.*\bFirefox\b)(?=.*\bMobile\b)/i; // Match 'Firefox' AND 'Mobile'
+
+  if (
+    apple_phone.test( ua )      ||
+    apple_phone.test( ua )      ||
+    apple_ipod.test( ua )       ||
+    apple_tablet.test( ua )     ||
+    android_phone.test( ua )    ||
+    android_tablet.test( ua )   ||
+    windows_phone.test( ua )    ||
+    windows_tablet.test( ua )   ||
+    other_blackberry.test( ua ) ||
+    other_opera.test( ua )      ||
+    other_firefox.test( ua )
+  ) {
+
+    return true;
+
+  } else {
+
+    return false;
+
+  }
+
+} )();
+
+var loadMesh = function ( url ) {
+
+  var d = new $.Deferred(),
+      loader = new THREE.JSONLoader();
+
+    loader.load( url, function( geometry, materials ) {
+
+    d.resolve( { geometry: geometry, materials: materials } );
+
+  } );
+
+  return d.promise();
+
+};
+
+
+
+////////////////////////////////////////
+// init
+////////////////////////////////////////
+var width, height, clock, scene, camera, renderer;
+var light, terrain, box, sphere;
+var world, groundBody, playerRadius = 1, playerObjectHolder, playerController;
+// var startPosition = new THREE.Vector3( -23, 10, -73 );
+var startPosition = new THREE.Vector3( 0, 10, 0 );
+var vent = new THREE.EventDispatcher();
+
+world = new THREEFIELD.World();
+
+var min = new THREE.Vector3( -150, -50, -150 );
+var max = new THREE.Vector3(  150,  50,  150 );
+var octree = new THREEFIELD.Octree( min, max, 5 );
+world.add( octree );
+
+width = window.innerWidth;
+height = window.innerHeight;
+
+clock = new THREE.Clock();
+scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2( 0xcccccc, 0.02 );
+
+camera = new THREE.PerspectiveCamera( 40, width / height, .01, 100 );
+camera.position.set( 0, 5, 30 );
+renderer = new THREE.WebGLRenderer( {
+  precision: !isMobile ? 'highp' : 'lowp',
+  antialias: !isMobile ? true : false,
+  stencil: false,
+  maxLights: !isMobile ? 4 : 2
+} );
+renderer.devicePixelRatio = !isMobile ? 1 : .5;
+renderer.setSize( width, height );
+renderer.setClearColor( 0xcccccc, 1 );
+document.body.appendChild( renderer.domElement );
+
+var ambientLight = new THREE.AmbientLight( 0xffffff )
+scene.add( ambientLight );
+
+var directionalLight = new THREE.DirectionalLight( 0xffffff );
+directionalLight.position.set( .5, 1, .5 ).normalize();
+scene.add( directionalLight );
+
+
+
+////////////////////////////////////////
+// contorols
+////////////////////////////////////////
+// player
+playerObjectHolder = new THREE.Object3D();
+playerObjectHolder.position.copy( startPosition );
+scene.add( playerObjectHolder );
+
+// sphere = new THREE.Mesh(
+//   new THREE.SphereGeometry( playerRadius, 16, 16 ),
+//   new THREE.MeshBasicMaterial( { color: 0xff0000,  wireframe: true} )
+// );
+// playerObjectHolder.add( sphere );
+
+playerController = new THREEFIELD.CharacterController( playerObjectHolder, playerRadius );
+world.addCharacter( playerController );
+
+// keyinput
+var keyInputControl = new THREEFIELD.KeyInputControl();
+
+// camera control
+var tpsCameraControl = new THREEFIELD.TPSCameraControl(
+  camera,
+  playerObjectHolder,
+  {
+    el: renderer.domElement,
+    offset: new THREE.Vector3( 0, 1, 0 ), // eye height
+    radius: 5,
+    // minRadius: 1,
+    maxRadius: 10,
+    rigidObjects: []
+  }
+);
+
+var buttonSvgSrc = [
+  '<svg width="48" height="48" viewBox="0 0 64 64">',
+    '<path fill="#fff" d="M44.5,54.5c-0.3-5.1-2.4-9.4-5.7-13.2C41,36,40.9,30,38.5,24.7c-1.2-2.7-3.9-4.4-6.9-3.3c-0.2,0.1-0.4,0.1-0.5,0.2c-3-4.3-6.6-8.3-10.1-11.8c-2.6-2.6-6.4,1.7-3.8,4.3c3.9,3.9,8.1,8.5,11,13.7c0,0.1,0.1,0.3,0.2,0.4c1.5,3.2,1.9,6.4,0.2,9.6c-0.3,0.5-0.4,1-0.5,1.5c-1.1,1.5-2.3,3-3.6,4.4c-0.8-2.3-1.4-4.7-1.6-7.1c-0.5-4.6-7.7-4.1-7.2,0.5c0.5,4.9,2.1,9.6,3.9,14.2c0.8,1.9,3.6,3.4,5.4,1.8c2.8-2.4,5.3-4.9,7.5-7.8c0.2,0.1,0.5,0.1,0.7,0.1c0.1,0.3,0.3,0.5,0.5,0.7c1.7,1.8,2.8,3.9,3.3,6.3c-2.2,0.8-4.6,1.4-7,1.4c-4.6,0.1-4.1,7.2,0.5,7.2c4-0.1,7.9-1.3,11.6-3C43.6,57.5,44.6,56.2,44.5,54.5z M34.2,8.9c0.7,0.1,1.6-0.1,2.3,0.3c1.5,0.8,2.6,2.1,3.2,3.6c0.2-2.2,0.5-4.3,0.8-6.5c0.5-3.7-5.1-4.7-5.7-1.1C34.6,6.3,34.3,7.8,34.2,8.9z"/>',
+    '<circle fill="#fff" cx="33.8" cy="15.2" r="4.9"/>',
+  '</svg>'
+].join('');
+
+var joystick1 = new virtualInput.Joystick( $( document.body ), 120, { id: 'joystick1' } );
+var joystick2 = new virtualInput.Joystick( $( document.body ), 120, { id: 'joystick2' } );
+var button1 = new virtualInput.Button( $( document.body ), 70, { id: 'button1', label: 'button1' } );
+var button2 = new virtualInput.Button( $( document.body ), 70, { id: 'button2', label: buttonSvgSrc } );
+
+
+
+
+////////////////////////////////////////
+// events
+////////////////////////////////////////
+
+// keyinput WASD
+keyInputControl.addEventListener( 'movekeyhold',    function () { playerController.isRunning = true; } );
+keyInputControl.addEventListener( 'movekeyrelease', function () { playerController.isRunning = false; } );
+keyInputControl.addEventListener( 'movekeychange', function () {
+
+  var cameraFrontAngle = tpsCameraControl.getFrontAngle();
+  var characterFrontAngle = keyInputControl.getFrontAngle();
+  playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
+
+} );
+
+// keyinput Space
+keyInputControl.addEventListener( 'jumpkeypress', function () { playerController.jump(); } );
+
+
+// joystick1
+joystick1.addEventListener( 'active',    function () { playerController.isRunning = true; } );
+joystick1.addEventListener( 'disactive', function () { playerController.isRunning = false; } );
+
+joystick1.addEventListener( 'move', function () {
+
+  var cameraFrontAngle = tpsCameraControl.getFrontAngle();
+  var characterFrontAngle = this.getAngle() + THREE.Math.degToRad( -90 );
+  playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
+
+} );
+
+
+// joystick2
+vent.addEventListener( 'beforerender', function () {
+
+  if ( joystick2.isActive ) {
+
+    tpsCameraControl.setLatLon(
+      tpsCameraControl.lat + joystick2.position.y * .5,
+      tpsCameraControl.lon - joystick2.position.x
+    );
+
+  }
+
+} );
+
+// button1.addEventListener( 'press', function () {
+//   animationController.play( 'attack' );
+//   // playerController.attack();
+// } );
+// button2
+button2.addEventListener( 'press', function () { playerController.jump(); } );
+
+
+
+
+////////////////////////////////////////
+// scene:santa
+////////////////////////////////////////
+
+var loadSanta = function () {
+
+  var d = new $.Deferred();
+  var santa;
+  var animationController;
+  var loader = new THREE.JSONLoader();
+  loader.load( 'santa-def.js.json', function( geometry, materials ) {
+    // console.log( materials );
+    materials.forEach(function ( mat ) {
+      mat.skinning = true;
+    } );
+
+
+    santa = new THREE.SkinnedMesh(
+      geometry,
+      new THREE.MeshFaceMaterial( materials )
+    );
+    santa.position.set( 0, 5, 0 );
+
+
+    animationController = new THREEFIELD.AnimationController( santa );
+    animationController.motion.attack.anim.loop = false;
+    animationController.motion.jump.anim.loop = false;
+    animationController.motion.slide.anim.loop = false;
+
+    scene.add( santa );
+
+    // player motion
+    playerController.addEventListener( 'startIdling',  function () { animationController.play( 'idle'  ); } );
+    playerController.addEventListener( 'startWalking', function () { animationController.play( 'run'   ); } );
+    playerController.addEventListener( 'startJumping', function () { animationController.play( 'jump'  ); } );
+    playerController.addEventListener( 'startSliding', function () { animationController.play( 'slide' ); } );
+    playerController.addEventListener( 'startFalling', function () { animationController.play( 'slide' ); } );
+
+    button1.addEventListener( 'press', function () {
+      animationController.play( 'attack' );
+    } );
+
+    vent.addEventListener( 'beforerender', function () {
+
+      animationController.mesh.position.set(
+        playerController.center.x,
+        playerController.center.y - playerController.radius,
+        playerController.center.z
+      );
+
+      animationController.mesh.rotation.y = playerController.direction + Math.PI;
+
+    } );
+
+    d.resolve( { santa: santa } );
+
+  } );
+
+  return d.promise();
+
+}
+
+
+////////////////////////////////////////
+// scene:level
+////////////////////////////////////////
+var loadLevel = function () {
+
+  var d = new $.Deferred();
+
+  $.when(
+    loadMesh( 'terrain.json' ),
+    loadMesh( 'bridge.json' ),
+    loadMesh( 'house.json' )
+  ).done( function ( terrain, bridge, house ) {
+
+    var terrain = new THREE.Mesh(
+      terrain.geometry,
+      // new THREE.MeshNormalMaterial()
+      new THREE.MeshFaceMaterial( terrain.materials )
+    );
+    scene.add( terrain );
+    octree.importThreeMesh( terrain );
+    tpsCameraControl.rigidObjects.push( terrain );
+
+
+
+    var bridge = new THREE.Mesh(
+      bridge.geometry,
+      // new THREE.MeshNormalMaterial()
+      new THREE.MeshFaceMaterial( bridge.materials )
+    );
+    bridge.scale.set( 1.2, 1.2, 1.2 );
+    bridge.position.set( -23, -21.35, -73 );
+    bridge.rotation.y = THREE.Math.degToRad( -35 );
+    scene.add( bridge );
+    octree.importThreeMesh( bridge );
+    tpsCameraControl.rigidObjects.push( bridge );
+
+
+
+    var house = new THREE.Mesh(
+      house.geometry,
+      // new THREE.MeshNormalMaterial()
+      new THREE.MeshFaceMaterial( house.materials )
+    );
+    window.house = house;
+    house.scale.set( 1.4, 1.4, 1.4 );
+    house.position.set( 6, -.5, -66 );
+    house.rotation.y = THREE.Math.degToRad( -35 );
+    house.geometry.computeBoundingBox();
+    scene.add( house );
+
+    var houseBody = new THREE.Mesh(
+      new THREE.BoxGeometry( 
+        house.geometry.boundingBox.max.x - house.geometry.boundingBox.min.x,
+        house.geometry.boundingBox.max.y - house.geometry.boundingBox.min.y,
+        house.geometry.boundingBox.max.z - house.geometry.boundingBox.min.z
+       ),
+      new THREE.MeshNormalMaterial()
+    );
+    houseBody.position.set(
+      house.position.x,
+      house.position.y,
+      house.position.z
+    );
+    houseBody.rotation.y = THREE.Math.degToRad( -35 );
+    // scene.add( houseBody );
+    octree.importThreeMesh( houseBody );
+    tpsCameraControl.rigidObjects.push( houseBody );
+
+
+
+
+    var geometry = new THREE.Geometry();
+    var material = new THREE.PointCloudMaterial( {
+      color: 0xFFFFFF,
+      size: 1,
+      map: THREE.ImageUtils.loadTexture( 'snowflake.png' ),
+      blending: THREE.AdditiveBlending,
+      transparent: true
+    } );
+
+    for ( var i = 0; i < 5000; i++ ) {
+
+      var vertex = new THREE.Vector3();
+      vertex.x = Math.random() * 300 - 150;
+      vertex.y = Math.random() * 100 -  50;
+      vertex.z = Math.random() * 300 - 150;
+      geometry.vertices.push( vertex );
+
+    }
+
+    var snow = new THREE.PointCloud( geometry, material );
+    snow.sortParticles = true;
+    scene.add( snow );
+
+    vent.addEventListener( 'beforerender', function () {
+
+      var particleLength = snow.geometry.vertices.length;
+      var particle;
+
+      while ( particleLength -- ) {
+
+        particle = snow.geometry.vertices[ particleLength ];
+        particle.y = particle.y < -50 ? 50 : particle.y - 0.1;
+        particle.x = particle.x < -150 ? 150 : particle.x - Math.random() * 0.02;
+        particle.z = particle.z < -150 ? 150 : particle.z - Math.random() * 0.02;
+
+      }
+
+      snow.geometry.__dirtyVertices = true;
+
+    } );
+
+
+
+
+
+    d.resolve();
+
+  } );
+
+  return d.promise();
+
+}
+
+
+
+
+
+////////////////////////////////////////
+// run
+////////////////////////////////////////
+
+$.when(
+  loadSanta(),
+  loadLevel()
+).done( function () {
+
+  ;( function update () {
+    
+    requestAnimationFrame( update );
+    
+    vent.dispatchEvent( { type: 'beforerender' } );
+    var delta = clock.getDelta();
+    THREE.AnimationHandler.update( delta );
+    tpsCameraControl.update();
+
+    world.step( delta );
+    renderer.render( scene, camera );
+    vent.dispatchEvent( { type: 'afterrender' } );
+    
+
+    if ( playerController.center.y < -20 ) {
+
+      playerController.center.copy( startPosition );
+
+    }
+
+  } )();
+
+} );
+
+
+////////////////////////////////////////
+// misc
+////////////////////////////////////////
+
+
+$( window ).on( 'resize', function onresize () {
+
+  width  = window.innerWidth;
+  height = window.innerHeight;
+  renderer.setSize( width, height );
+  document.body.appendChild( renderer.domElement );
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  tpsCameraControl.setNearPlainCornersWithPadding();
+
+} );
+
+$( window ).on( 'contextmenu', function ( e ) {
+
+  e.preventDefault();
+
+} );
+
+</script>
+
+</body>
+</html>
