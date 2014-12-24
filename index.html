@@ -10,10 +10,6 @@
 body{margin: 0;padding: 0; background: #000;}
 canvas{
   display: block;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
 }
 
 #joystick1,
@@ -81,6 +77,7 @@ canvas{
 <script src="lib/threefield.min.js"></script>
 <script src="lib/threefield.TPS.min.js"></script>
 <script src="lib/virtualInput.js"></script>
+<script src="CharacterController.js"></script>
 <script>
 
 ////////////////////////////////////////
@@ -174,7 +171,7 @@ renderer = new THREE.WebGLRenderer( {
   stencil: false,
   maxLights: !isMobile ? 4 : 2
 } );
-// renderer.devicePixelRatio = !isMobile ? 1 : .5;
+renderer.devicePixelRatio = !isMobile ? 1 : .5;
 renderer.setSize( width, height );
 renderer.setClearColor( 0xcccccc, 1 );
 document.body.appendChild( renderer.domElement );
@@ -222,7 +219,15 @@ var tpsCameraControl = new THREEFIELD.TPSCameraControl(
   }
 );
 
-var buttonSvgSrc = [
+
+var buttonSvgSrc1 = [
+  '<svg width="48" height="48" viewBox="0 0 64 64">',
+  '<path fill="#fff" d="M18,23.4c0,0,2.7-4.8,3-5.4c0.3-0.6,11.1-8.7,12.1-9.5c1.1-0.8,3.5-0.3,4.3,0.9c0.9,1.2,1.3,3.3,0.3,4.3c-1,1-11.4,9.3-11.4,9.3s1.4,0.9,1.6,1c0.3,0,6.5-0.8,6.5-0.8S48.9,8.5,50.4,7c1.6-1.4,4.1-0.8,4.7,0c0.7,0.8,1.6,2.7,0.5,3.9C54.6,12.2,39,29.2,39,29.2V54c0,0-0.4,4-3.7,4s-3.6-2-3.6-4.1c0-2.1-0.3-20-0.3-20l-6.1-0.4c0,0,2.1,3.9,3,5.6c0.8,1.6-0.3,3.5-1.6,4.2c-1.3,0.7-4.2,0.5-5.3-1.7c-1.2-2.2-5-9.8-5.9-11.1c-0.8-1.3-0.5-2.4,0-3.4C15.9,26.2,18,23.4,18,23.4z"/>',
+  '<circle fill="#fff" cx="13.6" cy="20.2" r="4.9"/>',
+  '</svg>'
+].join('');
+
+var buttonSvgSrc2 = [
   '<svg width="48" height="48" viewBox="0 0 64 64">',
     '<path fill="#fff" d="M44.5,54.5c-0.3-5.1-2.4-9.4-5.7-13.2C41,36,40.9,30,38.5,24.7c-1.2-2.7-3.9-4.4-6.9-3.3c-0.2,0.1-0.4,0.1-0.5,0.2c-3-4.3-6.6-8.3-10.1-11.8c-2.6-2.6-6.4,1.7-3.8,4.3c3.9,3.9,8.1,8.5,11,13.7c0,0.1,0.1,0.3,0.2,0.4c1.5,3.2,1.9,6.4,0.2,9.6c-0.3,0.5-0.4,1-0.5,1.5c-1.1,1.5-2.3,3-3.6,4.4c-0.8-2.3-1.4-4.7-1.6-7.1c-0.5-4.6-7.7-4.1-7.2,0.5c0.5,4.9,2.1,9.6,3.9,14.2c0.8,1.9,3.6,3.4,5.4,1.8c2.8-2.4,5.3-4.9,7.5-7.8c0.2,0.1,0.5,0.1,0.7,0.1c0.1,0.3,0.3,0.5,0.5,0.7c1.7,1.8,2.8,3.9,3.3,6.3c-2.2,0.8-4.6,1.4-7,1.4c-4.6,0.1-4.1,7.2,0.5,7.2c4-0.1,7.9-1.3,11.6-3C43.6,57.5,44.6,56.2,44.5,54.5z M34.2,8.9c0.7,0.1,1.6-0.1,2.3,0.3c1.5,0.8,2.6,2.1,3.2,3.6c0.2-2.2,0.5-4.3,0.8-6.5c0.5-3.7-5.1-4.7-5.7-1.1C34.6,6.3,34.3,7.8,34.2,8.9z"/>',
     '<circle fill="#fff" cx="33.8" cy="15.2" r="4.9"/>',
@@ -231,8 +236,8 @@ var buttonSvgSrc = [
 
 var joystick1 = new virtualInput.Joystick( $( document.body ), 120, { id: 'joystick1' } );
 var joystick2 = new virtualInput.Joystick( $( document.body ), 120, { id: 'joystick2' } );
-var button1 = new virtualInput.Button( $( document.body ), 70, { id: 'button1', label: 'button1' } );
-var button2 = new virtualInput.Button( $( document.body ), 70, { id: 'button2', label: buttonSvgSrc } );
+var button1 = new virtualInput.Button( $( document.body ), 70, { id: 'button1', label: buttonSvgSrc1 } );
+var button2 = new virtualInput.Button( $( document.body ), 70, { id: 'button2', label: buttonSvgSrc2 } );
 
 
 
@@ -283,11 +288,8 @@ vent.addEventListener( 'beforerender', function () {
 
 } );
 
-// button1.addEventListener( 'press', function () {
-//   animationController.play( 'attack' );
-//   // playerController.attack();
-// } );
-// button2
+
+// button1.addEventListener( 'press', function () { animationController.play( 'attack' ); } );
 button2.addEventListener( 'press', function () { playerController.jump(); } );
 
 
@@ -332,6 +334,9 @@ var loadSanta = function () {
     playerController.addEventListener( 'startFalling', function () { animationController.play( 'slide' ); } );
 
     button1.addEventListener( 'press', function () {
+      animationController.play( 'attack' );
+    } );
+    $( window ).on( 'click', function () {
       animationController.play( 'attack' );
     } );
 
@@ -467,10 +472,6 @@ var loadLevel = function () {
       snow.geometry.__dirtyVertices = true;
 
     } );
-
-
-
-
 
     d.resolve();
 
