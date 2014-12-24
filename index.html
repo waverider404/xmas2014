@@ -77,6 +77,7 @@ canvas{
 <script src="lib/threefield.min.js"></script>
 <script src="lib/threefield.TPS.min.js"></script>
 <script src="lib/virtualInput.js"></script>
+<script src="_/TPSCameraControl.js"></script>
 <script>
 
 ////////////////////////////////////////
@@ -332,12 +333,8 @@ var loadSanta = function () {
     playerController.addEventListener( 'startSliding', function () { animationController.play( 'slide' ); } );
     playerController.addEventListener( 'startFalling', function () { animationController.play( 'slide' ); } );
 
-    button1.addEventListener( 'press', function () {
-      animationController.play( 'attack' );
-    } );
-    $( window ).on( 'click', function () {
-      animationController.play( 'attack' );
-    } );
+    button1.addEventListener( 'press', function () { vent.dispatchEvent( { type: 'attack' } ); } );
+    vent.addEventListener( 'virtualClick', function () { vent.dispatchEvent( { type: 'attack' } ); } );
 
     vent.addEventListener( 'beforerender', function () {
 
@@ -348,6 +345,38 @@ var loadSanta = function () {
       );
 
       animationController.mesh.rotation.y = playerController.direction + Math.PI;
+
+    } );
+
+
+    var isAttacking = false;
+    vent.addEventListener( 'attack', function () {
+
+      if ( isAttacking || playerController.isJumping ) {
+
+        return;
+
+      }
+
+      isAttacking = true;
+      animationController.play( 'attack' );
+
+      setTimeout( function () {
+
+        if ( playerController.isIdling ) {
+
+          animationController.play( 'idle'  );
+          
+
+        } else if ( playerController.isRunning ) {
+
+          animationController.play( 'run' );
+
+        }
+
+        isAttacking = false;
+
+      }, 800 );
 
     } );
 
@@ -521,9 +550,29 @@ $.when(
 ////////////////////////////////////////
 // misc
 ////////////////////////////////////////
+var $win = $( window );
+var pointerCoords = new THREE.Vector2();
 
+$win.on( 'mousedown', function ( e ) {
 
-$( window ).on( 'resize', function onresize () {
+  pointerCoords.set( e.clientX, e.clientY );
+
+} );
+
+$win.on( 'mouseup', function ( e ) {
+
+  if (
+    ( pointerCoords.x - e.clientX ) === 0 &&
+    ( pointerCoords.y - e.clientY ) === 0
+  ) {
+
+    vent.dispatchEvent( { type: 'virtualClick' } );
+
+  }
+
+} );
+
+$win.on( 'resize', function onresize () {
 
   width  = window.innerWidth;
   height = window.innerHeight;
@@ -535,11 +584,13 @@ $( window ).on( 'resize', function onresize () {
 
 } );
 
-$( window ).on( 'contextmenu', function ( e ) {
+$win.on( 'contextmenu', function ( e ) {
 
   e.preventDefault();
 
 } );
+
+
 
 </script>
 
