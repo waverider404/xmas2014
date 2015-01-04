@@ -255,14 +255,6 @@ keyInputControl.addEventListener( 'movekeychange', function () {
 
 } );
 
-tpsCameraControl.addEventListener( 'updated', function () {
-
-  var cameraFrontAngle = tpsCameraControl.getFrontAngle();
-  var characterFrontAngle = keyInputControl.getFrontAngle();
-  playerController.direction = THREE.Math.degToRad( 360 ) - cameraFrontAngle + characterFrontAngle;
-  
-} );
-
 // keyinput Space
 keyInputControl.addEventListener( 'jumpkeypress', function () { playerController.jump(); } );
 
@@ -539,8 +531,6 @@ $.when(
 
     world.step( delta );
     renderer.render( scene, camera );
-    vent.dispatchEvent( { type: 'afterrender' } );
-    
 
     if ( playerController.center.y < -20 ) {
 
