@@ -73,8 +73,8 @@ canvas{
 <body>
 <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
 <script src="lib/three.min.js"></script>
-<script src="lib/gusoku.min.js"></script>
-<script src="lib/gusoku.TPS.min.js"></script>
+<script src="lib/meshwalk.min.js"></script>
+<script src="lib/meshwalk.TPS.min.js"></script>
 <script src="lib/virtualInput.js"></script>
 <script>
 
@@ -147,11 +147,11 @@ var world, groundBody, playerRadius = 1, playerObjectHolder, playerController;
 var startPosition = new THREE.Vector3( 0, 10, 0 );
 var vent = new THREE.EventDispatcher();
 
-world = new GUSOKU.World();
+world = new MW.World();
 
 var min = new THREE.Vector3( -150, -50, -150 );
 var max = new THREE.Vector3(  150,  50,  150 );
-var octree = new GUSOKU.Octree( min, max, 6 );
+var octree = new MW.Octree( min, max, 6 );
 world.add( octree );
 
 width = window.innerWidth;
@@ -197,14 +197,14 @@ scene.add( playerObjectHolder );
 // );
 // playerObjectHolder.add( sphere );
 
-playerController = new GUSOKU.CharacterController( playerObjectHolder, playerRadius );
+playerController = new MW.CharacterController( playerObjectHolder, playerRadius );
 world.add( playerController );
 
 // keyinput
-var keyInputControl = new GUSOKU.KeyInputControl();
+var keyInputControl = new MW.KeyInputControl();
 
 // camera control
-var tpsCameraControl = new GUSOKU.TPSCameraControl(
+var tpsCameraControl = new MW.TPSCameraControl(
   camera,
   playerObjectHolder,
   {
@@ -317,7 +317,7 @@ var loadSanta = function () {
     santa.position.set( 0, 5, 0 );
 
 
-    animationController = new GUSOKU.AnimationController( santa );
+    animationController = new MW.AnimationController( santa );
     animationController.motion.attack.anim.loop = false;
     animationController.motion.jump.anim.loop = false;
     animationController.motion.slide.anim.loop = false;
